@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 0002: UI Optimization & Debouncing</title>
+  <style>
+    :root {
+      --bg-color: #fffff8;
+      --text-color: #111111;
+      --accent-color: #b33939;
+      --sidebar-text: #555555;
+      --card-bg: #f8f8f0;
+      --border-color: #dddddd;
+      --success-color: #218c74;
+      --error-color: #b33939;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 18px;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: normal;
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+    }
+
+    .lesson-meta {
+      font-style: italic;
+      color: var(--sidebar-text);
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: normal;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.3rem;
+      margin-top: 2.5rem;
+      color: var(--accent-color);
+    }
+
+    p {
+      margin-bottom: 1.5rem;
+    }
+
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.9rem;
+      background-color: #f1f1e6;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    pre {
+      background-color: #f4f4eb;
+      border-left: 3px solid var(--accent-color);
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+
+    .section-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .main-content {
+      flex: 1 1 550px;
+    }
+
+    .sidenote {
+      flex: 1 1 200px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--sidebar-text);
+      border-left: 1px solid var(--border-color);
+      padding-left: 0.8rem;
+      margin-top: 0.5rem;
+      align-self: flex-start;
+    }
+
+    /* Interactive Timeline Card */
+    .visualizer-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: var(--sidebar-text);
+    }
+
+    input[type="text"] {
+      padding: 0.6rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 1.1rem;
+      background-color: #fff;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .timeline-container {
+      position: relative;
+      height: 150px;
+      background-color: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .timeline-label {
+      position: absolute;
+      left: 10px;
+      font-family: sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      color: #777777;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.8);
+      padding: 2px 5px;
+      border-radius: 3px;
+      z-index: 10;
+    }
+
+    #label-keystroke { top: 15px; }
+    #label-api { top: 85px; }
+
+    .lane {
+      height: 50%;
+      position: relative;
+      border-bottom: 1px dashed var(--border-color);
+      box-sizing: border-box;
+    }
+
+    .lane-bg {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+    }
+
+    .tick {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      top: 50%;
+      animation: fadeOut 3s forwards linear;
+    }
+
+    .keystroke-tick {
+      background-color: var(--accent-color);
+    }
+
+    .api-tick {
+      background-color: var(--success-color);
+      height: 24px;
+      width: 6px;
+      border-radius: 2px;
+    }
+
+    .counter-board {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 1rem;
+      background-color: #f1f1e6;
+      padding: 0.8rem;
+      border-radius: 4px;
+      font-family: sans-serif;
+      font-size: 0.9rem;
+    }
+
+    .counter-item {
+      text-align: center;
+    }
+
+    .counter-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+
+    #api-count-val {
+      color: var(--success-color);
+    }
+
+    /* Quiz */
+    .quiz-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .quiz-question {
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .quiz-option {
+      display: block;
+      padding: 0.8rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: #ffffff;
+      transition: background-color 0.2s;
+      font-size: 0.95rem;
+    }
+
+    .quiz-option:hover {
+      background-color: #f1f1e6;
+    }
+
+    .quiz-option.correct {
+      background-color: #d1e7dd !important;
+      border-color: #badbcc !important;
+      color: #0f5132;
+    }
+
+    .quiz-option.incorrect {
+      background-color: #f8d7da !important;
+      border-color: #f5c2c7 !important;
+      color: #842029;
+    }
+
+    .feedback-msg {
+      margin-top: 1rem;
+      font-style: italic;
+      font-weight: bold;
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+      margin-top: 3rem;
+      font-size: 0.95rem;
+    }
+
+    a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeOut {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+      100% { opacity: 0.2; transform: translate(-100px, -50%) scale(0.8); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="lesson-meta">Typeahead System Series — Lesson 0002</div>
+    <h1>UI Optimization & Debouncing</h1>
+    <div class="lesson-meta">Targeting: System Design Interview Success • Duration: 10 mins</div>
+  </header>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        Now that you understand that a Trie allows us to perform fast $O(L)$ prefix lookups, let's look at the client-side system. If we plug our prefix search input directly into the backend API, every single keypress from the user triggers a network request.
+      </p>
+      
+      <p>
+        If a user types <code>iphone</code>, their browser sends six separate requests in rapid succession:
+      </p>
+      
+      <pre><code>GET /suggest?q=i
+GET /suggest?q=ip
+GET /suggest?q=iph
+GET /suggest?q=ipho
+GET /suggest?q=iphon
+GET /suggest?q=iphone</code></pre>
+
+      <p>
+        With millions of concurrent users typing, this creates massive <strong>write/read pressure amplifications</strong> on your cache and database layers. More importantly, the suggestions for <code>i</code>, <code>ip</code>, and <code>iph</code> are completely wasted, since the user typed past them in milliseconds.
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Scale Calculation:</strong> If 10M users type a 10-character query without optimization, your servers must handle 100M API requests. Reducing this is critical for low-latency systems.
+    </div>
+  </div>
+
+  <h2>The Solution: Debouncing</h2>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        <strong>Debouncing</strong> is an optimization technique that guarantees a heavyweight function will only execute after a specific silent period of inactivity.
+      </p>
+      <p>
+        When the user presses a key, we do not call the API immediately. Instead, we set a timer (e.g., 300 milliseconds). If the user types another character before the 300ms timer runs out, we clear the previous timer and start a new one. Only when the user pauses typing for at least 300ms does the API call finally get sent.
+      </p>
+      <p>
+        Here is the standard, elegant Javascript implementation of a debounce wrapper:
+      </p>
+      
+      <pre><code>function debounce(fn, delay) {
+  let timer = null;
+  return function (...args) {
+    // Clear any pending triggers
+    clearTimeout(timer);
+    
+    // Schedule the execute
+    timer = setTimeout(() => {
+      fn.apply(this, args);
+    }, delay);
+  };
+}</code></pre>
+    </div>
+
+    <div class="sidenote">
+      <strong>Debouncing vs Throttling:</strong> Debouncing waits for a "quiet pause" of inactivity before executing. Throttling forces a function to run at a fixed maximum frequency (e.g., at most once every 300ms), regardless of pauses.
+    </div>
+  </div>
+
+  <h2>Interactive Debounce Timeline</h2>
+  <p>
+    Type rapidly in the input box below. Watch the live timeline scroll! The red dots represent your keystrokes, and the green bars show when an API call was actually sent to your backend. Toggle debouncing or adjust the delay slider to see the dramatic reduction in server load!
+  </p>
+
+  <div class="visualizer-card">
+    <div class="controls">
+      <div class="form-group" style="flex: 1; min-width: 200px;">
+        <label for="search-input">Interactive Search Input</label>
+        <input type="text" id="search-input" placeholder="Type here (e.g., 'system design')" />
+      </div>
+      
+      <div class="form-group">
+        <label for="debounce-toggle">Debouncing</label>
+        <select id="debounce-toggle" onchange="resetCounters()" style="padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border-color); font-size: 1rem;">
+          <option value="on">Enabled (Safe)</option>
+          <option value="off">Disabled (Dangerous)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="delay-slider" id="delay-label">Delay: 300ms</label>
+        <input type="range" id="delay-slider" min="100" max="800" step="50" value="300" oninput="updateDelayLabel(this.value)" />
+      </div>
+    </div>
+
+    <div class="timeline-container">
+      <div id="label-keystroke" class="timeline-label">Keystrokes (Client)</div>
+      <div id="label-api" class="timeline-label">API Requests (Server)</div>
+      
+      <div class="lane" id="keystroke-lane">
+        <div class="lane-bg" id="keystroke-bg"></div>
+      </div>
+      <div class="lane" id="api-lane">
+        <div class="lane-bg" id="api-bg"></div>
+      </div>
+    </div>
+
+    <div class="counter-board">
+      <div class="counter-item">
+        <div>Keystrokes Registered</div>
+        <div class="counter-value" id="keystroke-count-val">0</div>
+      </div>
+      <div class="counter-item">
+        <div>API Requests Sent</div>
+        <div class="counter-value" id="api-count-val">0</div>
+      </div>
+      <div class="counter-item">
+        <div>Reduction Ratio</div>
+        <div class="counter-value" id="reduction-ratio-val">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Retrieval Practice</h2>
+
+  <!-- Quiz 1 -->
+  <div class="quiz-container" id="quiz-1">
+    <div class="quiz-question">1. If a user types "fast" at 1 character per 100ms, and the debounce delay is 300ms, how many API requests are sent?</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 0, this)">Only one API request is sent</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 1, this)">Four separate requests sent!</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 2, this)">Zero separate requests sent!</div>
+    <div class="feedback-msg" id="quiz-1-feedback"></div>
+  </div>
+
+  <!-- Quiz 2 -->
+  <div class="quiz-container" id="quiz-2">
+    <div class="quiz-question">2. In a high-volume typeahead system, what is the key difference between debouncing and throttling?</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 0, this)">Debounce waits for a silent period</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 1, this)">Throttle executes at constant rate</div>
+    <div class="feedback-msg" id="quiz-2-feedback"></div>
+  </div>
+
+  <div class="section-container">
+    <div class="main-content">
+      <h2>Next Steps</h2>
+      <p>
+        Excellent work. By implementing debouncing on the client side, we have protected our system from unnecessary read requests.
+      </p>
+      <p>
+        Next, we will move to the write path: **[Lesson 0003: Write Buffering & Aggregation]**. When users submit a completed search query, how do we update our database without overloading it with synchronous writes?
+      </p>
+      <p>
+        If you have any questions on timers, closure mechanics, or the trade-offs of using larger debounce windows, just ask me!
+      </p>
+    </div>
+  </div>
+
+  <div class="nav-links">
+    <span><a href="0001-trie-fundamentals.html">&larr; Previous: Lesson 0001</a></span>
+    <span>Recommended Primary Source: <a href="https://github.com/donnemartin/system-design-primer" target="_blank">The System Design Primer</a></span>
+    <span><a href="0003-write-buffering.html" id="next-link">Next: Lesson 0003 &rarr;</a></span>
+  </div>
+
+  <script>
+    let keystrokeCount = 0;
+    let apiCount = 0;
+    let debounceTimer = null;
+    let debounceDelay = 300;
+
+    const keystrokeLane = document.getElementById('keystroke-bg');
+    const apiLane = document.getElementById('api-bg');
+    const searchInput = document.getElementById('search-input');
+    const keystrokeCounter = document.getElementById('keystroke-count-val');
+    const apiCounter = document.getElementById('api-count-val');
+    const reductionRatio = document.getElementById('reduction-ratio-val');
+
+    function updateDelayLabel(val) {
+      debounceDelay = parseInt(val);
+      document.getElementById('delay-label').textContent = `Delay: ${debounceDelay}ms`;
+    }
+
+    function resetCounters() {
+      keystrokeCount = 0;
+      apiCount = 0;
+      keystrokeCounter.textContent = '0';
+      apiCounter.textContent = '0';
+      reductionRatio.textContent = '0%';
+      keystrokeLane.innerHTML = '';
+      apiLane.innerHTML = '';
+    }
+
+    // Capture user input and drive simulation
+    searchInput.addEventListener('input', (e) => {
+      keystrokeCount++;
+      keystrokeCounter.textContent = keystrokeCount;
+      
+      // Trigger a Keystroke Tick visual
+      spawnTick(keystrokeLane, 'keystroke-tick');
+
+      const isDebounceOn = document.getElementById('debounce-toggle').value === 'on';
+
+      if (isDebounceOn) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          triggerApiCall();
+        }, debounceDelay);
+      } else {
+        triggerApiCall();
+      }
+    });
+
+    function triggerApiCall() {
+      apiCount++;
+      apiCounter.textContent = apiCount;
+      spawnTick(apiLane, 'api-tick');
+      
+      // Calculate reduction
+      const ratio = Math.round(((keystrokeCount - apiCount) / keystrokeCount) * 100);
+      reductionRatio.textContent = `${Math.max(0, ratio)}%`;
+    }
+
+    // Animate a tick scrolling across the timeline
+    function spawnTick(lane, className) {
+      const tick = document.createElement('div');
+      tick.className = `tick ${className}`;
+      tick.style.left = '95%'; // start at right side
+      lane.appendChild(tick);
+
+      // Move tick leftward via JS interval to sync multiple lanes perfectly
+      let position = 95;
+      const interval = setInterval(() => {
+        position -= 1.5;
+        tick.style.left = `${position}%`;
+        
+        if (position < 5) {
+          clearInterval(interval);
+          if (tick.parentNode === lane) {
+            lane.removeChild(tick);
+          }
+        }
+      }, 30);
+    }
+
+    // Quiz Checking Logic
+    const correctAnswers = {
+      1: 0, // Only one API request is sent
+      2: 0  // Debounce waits for a silent period
+    };
+
+    function checkAnswer(quizId, optionIndex, element) {
+      const container = document.getElementById(`quiz-${quizId}`);
+      const options = container.querySelectorAll('.quiz-option');
+      const feedback = document.getElementById(`quiz-${quizId}-feedback`);
+      
+      options.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect');
+      });
+      
+      if (optionIndex === correctAnswers[quizId]) {
+        element.classList.add('correct');
+        feedback.textContent = "Correct! Spot on.";
+        feedback.style.color = "var(--success-color)";
+      } else {
+        element.classList.add('incorrect');
+        options[correctAnswers[quizId]].classList.add('correct');
+        feedback.textContent = "Incorrect. Think about the silent pause versus constant rate.";
+        feedback.style.color = "var(--error-color)";
+      }
+    }
+  </script>
+</body>
+</html>

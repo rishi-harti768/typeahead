@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 0005: Trending & Recency-Aware Ranking</title>
+  <style>
+    :root {
+      --bg-color: #fffff8;
+      --text-color: #111111;
+      --accent-color: #b33939;
+      --sidebar-text: #555555;
+      --card-bg: #f8f8f0;
+      --border-color: #dddddd;
+      --success-color: #218c74;
+      --error-color: #b33939;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 18px;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: normal;
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+    }
+
+    .lesson-meta {
+      font-style: italic;
+      color: var(--sidebar-text);
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: normal;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.3rem;
+      margin-top: 2.5rem;
+      color: var(--accent-color);
+    }
+
+    p {
+      margin-bottom: 1.5rem;
+    }
+
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.9rem;
+      background-color: #f1f1e6;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    pre {
+      background-color: #f4f4eb;
+      border-left: 3px solid var(--accent-color);
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+
+    .section-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .main-content {
+      flex: 1 1 550px;
+    }
+
+    .sidenote {
+      flex: 1 1 200px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--sidebar-text);
+      border-left: 1px solid var(--border-color);
+      padding-left: 0.8rem;
+      margin-top: 0.5rem;
+      align-self: flex-start;
+    }
+
+    /* Trending score calculator visual card */
+    .visualizer-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+      background: #f1f1e6;
+      padding: 1rem;
+      border-radius: 4px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .form-group label {
+      font-family: sans-serif;
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--sidebar-text);
+      text-transform: uppercase;
+    }
+
+    .trending-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: sans-serif;
+      font-size: 0.95rem;
+    }
+
+    .trending-table th, .trending-table td {
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.8rem;
+      text-align: left;
+    }
+
+    .trending-table th {
+      color: var(--sidebar-text);
+      font-weight: bold;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+    }
+
+    .bar-container {
+      width: 100%;
+      background-color: #e0e0d0;
+      height: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background-color: var(--accent-color);
+      width: 0%;
+      transition: width 0.2s ease-out;
+    }
+
+    /* Quiz */
+    .quiz-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .quiz-question {
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .quiz-option {
+      display: block;
+      padding: 0.8rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: #ffffff;
+      transition: background-color 0.2s;
+      font-size: 0.95rem;
+    }
+
+    .quiz-option:hover {
+      background-color: #f1f1e6;
+    }
+
+    .quiz-option.correct {
+      background-color: #d1e7dd !important;
+      border-color: #badbcc !important;
+      color: #0f5132;
+    }
+
+    .quiz-option.incorrect {
+      background-color: #f8d7da !important;
+      border-color: #f5c2c7 !important;
+      color: #842029;
+    }
+
+    .feedback-msg {
+      margin-top: 1rem;
+      font-style: italic;
+      font-weight: bold;
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+      margin-top: 3rem;
+      font-size: 0.95rem;
+    }
+
+    a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="lesson-meta">Typeahead System Series — Lesson 0005</div>
+    <h1>Trending & Recency-Aware Ranking</h1>
+    <div class="lesson-meta">Targeting: System Design Interview Success • Duration: 15 mins</div>
+  </header>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        In a basic typeahead system, suggestions are sorted strictly by their <strong>overall historical search count</strong>. While this works well for evergreen queries (e.g., "java tutorial" or "how to tie a tie"), it fails catastrophically when real-world events trigger sudden viral surges of interest.
+      </p>
+      
+      <p>
+        If the Super Bowl is happening *right now*, users typing <code>su</code> expect to see "super bowl live". But if "super bowl live" only has 5,000 historical searches compared to "sushi recipe" which has 500,000 historical searches over five years, the viral trend is completely buried.
+      </p>
+
+      <p>
+        How do we elevate active trends without permanently over-ranking queries that are only popular for a brief period?
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>The Recency Challenge:</strong> If we simply boost anything searched recently, typo-queries or short-term spam will dominate your suggestions. We need a mathematical model to decay trends gracefully.
+    </div>
+  </div>
+
+  <h2>The Solution: Exponential Time Decay</h2>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        To balance historical stability with instant viral freshness, we compute a recency-aware score using **Exponential Time Decay**.
+      </p>
+      <p>
+        We separate each query's popularity score into two components:
+      </p>
+      <pre><code>Score = HistoricalBaseline + (SpikeCount * 0.5 ^ (TimePassed / HalfLife))</code></pre>
+      <p>
+        Where:
+      </p>
+      <ul>
+        <li><strong>HistoricalBaseline:</strong> The long-term, stable popularity count of the search query.</li>
+        <li><strong>SpikeCount:</strong> The volume of fresh searches recorded during the current temporal event.</li>
+        <li><strong>TimePassed:</strong> The hours or days that have elapsed since the peak of the search event.</li>
+        <li><strong>HalfLife:</strong> The time window in which a trend's weight halves (e.g., 12 hours).</li>
+      </ul>
+      <p>
+        <strong>Why this is elegant:</strong> During a viral spike, <code>SpikeCount</code> dominates, vaulting the query to the absolute top of suggestions. As the event passes and <code>TimePassed</code> increases, the spike decays exponentially. Within a few days, the score naturally settles back to its <code>HistoricalBaseline</code> without manual database intervention!
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Cache Invalidation:</strong> Because scores decay continuously, how do we prevent stale cache hits? We implement **passive expiration** using short TTLs on cache entries (e.g., 5 mins) or **active updates** via streaming cron-jobs (e.g., Flink) that refresh top Tries periodically.
+    </div>
+  </div>
+
+  <h2>Interactive Time-Decay Calculator</h2>
+  <p>
+    Watch exponential decay in action. Drag the **Time Elapsed Slider** to simulate hours passing since a massive temporal event (like the Super Bowl kickoff). Watch how "super bowl live" dominates at hour 0, but slowly sinks down below stable giants ("java tutorial" and "iphone") as the trend fades.
+  </p>
+
+  <div class="visualizer-card">
+    <div class="controls">
+      <div class="form-group">
+        <label for="time-slider" id="time-label">Time Passed since Spike: 0 hours</label>
+        <input type="range" id="time-slider" min="0" max="72" value="0" oninput="updateTimeSlider(this.value)" style="width: 100%;" />
+      </div>
+      <div class="form-group" style="max-width: 120px;">
+        <label>Spike Half-Life</label>
+        <div style="font-family: sans-serif; font-weight: bold; font-size: 1.1rem; margin-top: 0.3rem;">12 Hours</div>
+      </div>
+    </div>
+
+    <table class="trending-table">
+      <thead>
+        <tr>
+          <th>Query</th>
+          <th>Historical Count</th>
+          <th>Spike Count (Raw)</th>
+          <th>Decayed Spike Score</th>
+          <th style="width: 30%;">Total Score Rank</th>
+        </tr>
+      </thead>
+      <tbody id="trending-body">
+        <!-- Rendered by JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Retrieval Practice</h2>
+
+  <!-- Quiz 1 -->
+  <div class="quiz-container" id="quiz-1">
+    <div class="quiz-question">1. What is the main advantage of using an exponential decay formula for typeahead search rankings?</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 0, this)">Fades viral spikes back to standard logs</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 1, this)">Reduces memory buffer size inside cache!</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 2, this)">Eliminates network latency delay bounds!</div>
+    <div class="feedback-msg" id="quiz-1-feedback"></div>
+  </div>
+
+  <!-- Quiz 2 -->
+  <div class="quiz-container" id="quiz-2">
+    <div class="quiz-question">2. How is cache freshness maintained when search rankings change continuously due to time decay?</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 0, this)">Use a passive TTL or active cron rebuild</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 1, this)">Enforce synchronous database file writes</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 2, this)">Deploy multiple independent master rings</div>
+    <div class="feedback-msg" id="quiz-2-feedback"></div>
+  </div>
+
+  <div class="section-container">
+    <div class="main-content">
+      <h2>Syllabus Completed!</h2>
+      <p>
+        Congratulations! You have completed the theoretical and architectural syllabus of your scalable search typeahead system.
+      </p>
+      <p>
+        Let's review the milestones you have established:
+      </p>
+      <ol>
+        <li><strong>Trie Mechanics:</strong> Understood prefix-based tree matching and $O(L)$ bounds.</li>
+        <li><strong>Client Optimization:</strong> Mastered debouncing to minimize read pressure.</li>
+        <li><strong>Write Buffering:</strong> Designed write aggregation and handled server durability crashes.</li>
+        <li><strong>Consistent Hashing:</strong> Distributed keyspace horizontally on a hash ring.</li>
+        <li><strong>Trending Searches:</strong> Formulated recency-aware ranking via exponential decay.</li>
+      </ol>
+      <p>
+        Next, we will begin our **hands-on implementation coding phase**! We will write the Node.js backend files, data parser, and client UI.
+      </p>
+      <p>
+        Ask me any questions on ranking decay math, caching strategies, or let me know when you are ready to write code!
+      </p>
+    </div>
+  </div>
+
+  <div class="nav-links">
+    <span><a href="0004-consistent-hashing.html">&larr; Previous: Lesson 0004</a></span>
+    <span>Recommended Primary Source: <a href="https://redis.io/docs/latest/develop/data-types/sorted-sets/" target="_blank">Redis Sorted Sets (ZSET)</a></span>
+    <span>Next: Coding Implementation &rarr;</span>
+  </div>
+
+  <script>
+    // System Data
+    const dataset = [
+      { word: 'java tutorial', historical: 10000, spike: 0 },
+      { word: 'iphone', historical: 8000, spike: 0 },
+      { word: 'super bowl live', historical: 100, spike: 25000 }
+    ];
+
+    const halfLife = 12; // hours
+
+    function updateTimeSlider(hours) {
+      document.getElementById('time-label').textContent = `Time Passed since Spike: ${hours} hours`;
+      renderDecay(parseInt(hours));
+    }
+
+    function renderDecay(hoursPassed) {
+      const tbody = document.getElementById('trending-body');
+      tbody.innerHTML = '';
+
+      // Compute Decayed Scores
+      const calculatedData = dataset.map(item => {
+        const decayFactor = Math.pow(0.5, hoursPassed / halfLife);
+        const decayedSpike = Math.round(item.spike * decayFactor);
+        const totalScore = item.historical + decayedSpike;
+        return {
+          ...item,
+          decayedSpike,
+          totalScore
+        };
+      });
+
+      // Sort descending total score
+      calculatedData.sort((a,b) => b.totalScore - a.totalScore);
+
+      // Max score for bar width calculation
+      const maxScore = Math.max(...calculatedData.map(d => d.totalScore));
+
+      calculatedData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        const barPercent = Math.max(5, (item.totalScore / maxScore) * 100);
+
+        row.innerHTML = `
+          <td><strong>${item.word}</strong></td>
+          <td>${item.historical.toLocaleString()}</td>
+          <td>${item.spike.toLocaleString()}</td>
+          <td>${item.decayedSpike.toLocaleString()}</td>
+          <td>
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+              <span>Rank #${index + 1}</span>
+              <span>${item.totalScore.toLocaleString()}</span>
+            </div>
+            <div class="bar-container">
+              <div class="bar-fill" style="width: ${barPercent}%;"></div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Quiz Checking Logic
+    const correctAnswers = {
+      1: 0, // Fades viral spikes back to standard logs
+      2: 0  // Use a passive TTL or active cron rebuild
+    };
+
+    function checkAnswer(quizId, optionIndex, element) {
+      const container = document.getElementById(`quiz-${quizId}`);
+      const options = container.querySelectorAll('.quiz-option');
+      const feedback = document.getElementById(`quiz-${quizId}-feedback`);
+      
+      options.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect');
+      });
+      
+      if (optionIndex === correctAnswers[quizId]) {
+        element.classList.add('correct');
+        feedback.textContent = "Correct! Superb understanding.";
+        feedback.style.color = "var(--success-color)";
+      } else {
+        element.classList.add('incorrect');
+        options[correctAnswers[quizId]].classList.add('correct');
+        feedback.textContent = "Incorrect. Reflect on cache invalidation strategies and exponential decay parameters.";
+        feedback.style.color = "var(--error-color)";
+      }
+    }
+
+    // Launch setup
+    renderDecay(0);
+  </script>
+</body>
+</html>

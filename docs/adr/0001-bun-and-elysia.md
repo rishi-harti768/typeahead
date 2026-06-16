@@ -1,0 +1,3 @@
+# Bun and Elysia for Runtime and API Framework
+
+For the implementation of the search typeahead system, we decided to use the Bun JS runtime and the Elysia JS framework instead of the traditional Node.js/Express stack. Bun provides native TypeScript support and ultra-high-speed file I/O (critical for fast Write-Ahead Logging), while Elysia offers high-performance, type-friendly HTTP routing that aligns with the low-latency autocomplete requirements (sub-10ms target). This choice optimizes API response times and minimizes setup complexity by avoiding separate transpilation/compilation steps for TypeScript.

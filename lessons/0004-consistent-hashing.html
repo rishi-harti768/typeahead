@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 0004: Consistent Hashing & Distributed Cache</title>
+  <style>
+    :root {
+      --bg-color: #fffff8;
+      --text-color: #111111;
+      --accent-color: #b33939;
+      --sidebar-text: #555555;
+      --card-bg: #f8f8f0;
+      --border-color: #dddddd;
+      --success-color: #218c74;
+      --error-color: #b33939;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 18px;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: normal;
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+    }
+
+    .lesson-meta {
+      font-style: italic;
+      color: var(--sidebar-text);
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: normal;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.3rem;
+      margin-top: 2.5rem;
+      color: var(--accent-color);
+    }
+
+    p {
+      margin-bottom: 1.5rem;
+    }
+
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.9rem;
+      background-color: #f1f1e6;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    pre {
+      background-color: #f4f4eb;
+      border-left: 3px solid var(--accent-color);
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+
+    .section-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .main-content {
+      flex: 1 1 550px;
+    }
+
+    .sidenote {
+      flex: 1 1 200px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--sidebar-text);
+      border-left: 1px solid var(--border-color);
+      padding-left: 0.8rem;
+      margin-top: 0.5rem;
+      align-self: flex-start;
+    }
+
+    /* Hash Ring Simulator */
+    .visualizer-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+
+    .svg-ring-container {
+      width: 100%;
+      height: 400px;
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      font-family: sans-serif;
+    }
+
+    .mapping-table th, .mapping-table td {
+      border: 1px solid var(--border-color);
+      padding: 0.5rem;
+      text-align: left;
+    }
+
+    .mapping-table th {
+      background-color: #f1f1e6;
+    }
+
+    /* Quiz */
+    .quiz-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .quiz-question {
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .quiz-option {
+      display: block;
+      padding: 0.8rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: #ffffff;
+      transition: background-color 0.2s;
+      font-size: 0.95rem;
+    }
+
+    .quiz-option:hover {
+      background-color: #f1f1e6;
+    }
+
+    .quiz-option.correct {
+      background-color: #d1e7dd !important;
+      border-color: #badbcc !important;
+      color: #0f5132;
+    }
+
+    .quiz-option.incorrect {
+      background-color: #f8d7da !important;
+      border-color: #f5c2c7 !important;
+      color: #842029;
+    }
+
+    .feedback-msg {
+      margin-top: 1rem;
+      font-style: italic;
+      font-weight: bold;
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+      margin-top: 3rem;
+      font-size: 0.95rem;
+    }
+
+    a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="lesson-meta">Typeahead System Series — Lesson 0004</div>
+    <h1>Consistent Hashing & Distributed Cache</h1>
+    <div class="lesson-meta">Targeting: System Design Interview Success • Duration: 15 mins</div>
+  </header>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        In a large-scale typeahead system, a single caching server cannot hold all prefix-to-suggestion lists, nor can it handle the millions of read queries per second. We must scale horizontally by distributing our cache data across a cluster of servers.
+      </p>
+      
+      <p>
+        The immediate question is: <strong>How do we route prefix keys to cache servers?</strong>
+      </p>
+
+      <p>
+        If we use standard modulo hashing:
+      </p>
+      <pre><code>ServerIndex = Hash(Key) % N</code></pre>
+      <p>
+        Where $N$ is the number of servers.
+      </p>
+      
+      <p>
+        <strong>The "Rehash Storm" Disaster:</strong> This formula works fine until $N$ changes. If a cache server crashes or we add a new server to handle peak traffic, $N$ changes. Suddenly, nearly 100% of all keys map to completely different servers. This triggers a massive, system-wide cache miss storm, driving all traffic to your fallback database and crashing your entire service.
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Modulo Failure:</strong> If $N$ changes from 9 to 10, keys that hashed to Server 4 might now hash to Server 5. Over 90% of your cache lookups will instantly miss!
+    </div>
+  </div>
+
+  <h2>The Solution: Consistent Hashing</h2>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        <strong>Consistent Hashing</strong> is a routing algorithm where only a fraction of keys ($K/N$) need to be remapped when the server pool size changes.
+      </p>
+      <p>
+        Here is how it works:
+      </p>
+      <ol>
+        <li>We define a logical **Hash Ring** (representing hash range, e.g., 0 to $2^{32}-1$).</li>
+        <li>We hash and map our **Cache Servers** onto various positions on this circular ring.</li>
+        <li>We hash and map our **Prefix Keys** onto the same ring.</li>
+        <li>To locate the server for a key, we start at the key's position on the ring and move **clockwise** until we encounter the first cache server. That server owns the key.</li>
+      </ol>
+      <p>
+        <strong>Why it scales:</strong> When you add a new server, it only splits the keys of its immediate counter-clockwise neighbor. All other servers' keys remain untouched, completely preventing cache miss storms!
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Virtual Nodes:</strong> In practice, physical servers might hash to positions close to each other, creating uneven "hotspots". To fix this, we map multiple *virtual nodes* (e.g., Node-A#1, Node-A#2) per physical node across the ring to balance the key distribution.
+    </div>
+  </div>
+
+  <h2>Interactive Consistent Hashing Ring</h2>
+  <p>
+    Experiment with the routing live. Type keys (e.g., "ca", "react", "iph") and add them to the ring. Add or remove cache servers, and toggle **Virtual Nodes** to see how the keys distribute across the pool.
+  </p>
+
+  <div class="visualizer-card">
+    <div class="controls">
+      <button onclick="addPhysicalNode()" style="background-color: var(--success-color);">Add Cache Node</button>
+      <button onclick="removePhysicalNode()" style="background-color: var(--error-color);">Remove Cache Node</button>
+      
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+        <label for="vnodes-toggle" style="margin:0;">Virtual Nodes:</label>
+        <select id="vnodes-toggle" onchange="toggleVirtualNodes()" style="padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border-color);">
+          <option value="off">Off (1 point per node)</option>
+          <option value="on">On (3 points per node)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="svg-ring-container">
+      <svg id="ring-svg"></svg>
+    </div>
+
+    <table class="mapping-table">
+      <thead>
+        <tr>
+          <th>Key Prefix</th>
+          <th>Key Angle</th>
+          <th>Routed Cache Server</th>
+          <th>Ownership Angle</th>
+        </tr>
+      </thead>
+      <tbody id="mapping-body">
+        <tr>
+          <td colspan="4" style="text-align: center; color: #999;">No keys on the ring. Type inside the code box or add nodes to view!</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+      <input type="text" id="key-input" placeholder="Type key prefix (e.g., 'iph')" value="iph" style="width: 150px; padding: 0.4rem;" />
+      <button onclick="addKeyPrefix()" style="padding: 0.4rem 1rem;">Map Key to Ring</button>
+    </div>
+  </div>
+
+  <h2>Retrieval Practice</h2>
+
+  <!-- Quiz 1 -->
+  <div class="quiz-container" id="quiz-1">
+    <div class="quiz-question">1. What is the primary problem solved by consistent hashing when scaling out cache nodes?</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 0, this)">Avoids cache miss storms during scaling</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 1, this)">Enforces strict data safety standards!</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 2, this)">Eliminates network latency delays too!</div>
+    <div class="feedback-msg" id="quiz-1-feedback"></div>
+  </div>
+
+  <!-- Quiz 2 -->
+  <div class="quiz-container" id="quiz-2">
+    <div class="quiz-question">2. Why are virtual nodes introduced in consistent hashing configurations?</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 0, this)">Balances the key distribution patterns</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 1, this)">Creates backup replica copies directly</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 2, this)">Enforces strict network security rules</div>
+    <div class="feedback-msg" id="quiz-2-feedback"></div>
+  </div>
+
+  <div class="section-container">
+    <div class="main-content">
+      <h2>Next Steps</h2>
+      <p>
+        Outstanding! Scaling horizontally via Consistent Hashing ensures your typeahead caches handle heavy read pressure without falling over.
+      </p>
+      <p>
+        Next, we will complete the advanced syllabus: **[Lesson 0005: Trending & Recency-Aware Ranking]**. How do we calculate trending searches in real-time, prioritizing fresh searches over static, historical favorites?
+      </p>
+      <p>
+        Ask me any questions about hash algorithms (like MurmurHash or SHA-1) or hash ring balance!
+      </p>
+    </div>
+  </div>
+
+  <div class="nav-links">
+    <span><a href="0003-write-buffering.html">&larr; Previous: Lesson 0003</a></span>
+    <span>Recommended Primary Source: <a href="https://www.tom-e-white.com/2007/11/consistent-hashing.html" target="_blank">Tom White's Consistent Hashing</a></span>
+    <span><a href="0005-trending-searches.html" id="next-link">Next: Lesson 0005 &rarr;</a></span>
+  </div>
+
+  <script>
+    // Simulator State
+    let physicalNodes = ['Node-A', 'Node-B', 'Node-C'];
+    let keys = ['ca', 'react', 'iph', 'node'];
+    let useVirtualNodes = false;
+
+    // Fixed hashes for consistent ring display
+    const nodeHashes = {
+      'Node-A': 60,
+      'Node-B': 180,
+      'Node-C': 300,
+      'Node-D': 120,
+      'Node-E': 240,
+      // Virtual positions
+      'Node-A#1': 60, 'Node-A#2': 140, 'Node-A#3': 220,
+      'Node-B#1': 180, 'Node-B#2': 260, 'Node-B#3': 340,
+      'Node-C#1': 300, 'Node-C#2': 20, 'Node-C#3': 100,
+      'Node-D#1': 120, 'Node-D#2': 200, 'Node-D#3': 280,
+      'Node-E#1': 240, 'Node-E#2': 320, 'Node-E#3': 40
+    };
+
+    const keyHashes = {
+      'ca': 45,
+      'react': 160,
+      'iph': 210,
+      'node': 325,
+      'java': 85,
+      'python': 275
+    };
+
+    const nodeColors = {
+      'Node-A': '#b33939',
+      'Node-B': '#218c74',
+      'Node-C': '#227093',
+      'Node-D': '#845ec2',
+      'Node-E': '#ff9671'
+    };
+
+    function renderRing() {
+      const svg = document.getElementById('ring-svg');
+      svg.innerHTML = ''; // Clear SVG
+
+      const cx = svg.clientWidth / 2 || 200;
+      const cy = svg.clientHeight / 2 || 200;
+      const r = 120;
+
+      // Draw Main Ring
+      const mainRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      mainRing.setAttribute('cx', cx);
+      mainRing.setAttribute('cy', cy);
+      mainRing.setAttribute('r', r);
+      mainRing.setAttribute('fill', 'none');
+      mainRing.setAttribute('stroke', '#dddddd');
+      mainRing.setAttribute('stroke-width', '4');
+      svg.appendChild(mainRing);
+
+      // Collect active ring positions
+      const ringPositions = [];
+      physicalNodes.forEach(node => {
+        if (useVirtualNodes) {
+          for (let i = 1; i <= 3; i++) {
+            const vnodeName = `${node}#${i}`;
+            ringPositions.push({
+              name: vnodeName,
+              physicalName: node,
+              angle: nodeHashes[vnodeName],
+              isVirtual: true
+            });
+          }
+        } else {
+          ringPositions.push({
+            name: node,
+            physicalName: node,
+            angle: nodeHashes[node],
+            isVirtual: false
+          });
+        }
+      });
+
+      // Sort ring positions clockwise (ascending angle)
+      ringPositions.sort((a,b) => a.angle - b.angle);
+
+      // Map Keys and determine routing
+      const mappingTableBody = document.getElementById('mapping-body');
+      mappingTableBody.innerHTML = '';
+
+      keys.forEach(key => {
+        const keyAngle = keyHashes[key] || Math.floor(Math.random() * 360);
+        if (!keyHashes[key]) keyHashes[key] = keyAngle; // persist custom keys
+
+        // Find routed node (first clockwise node)
+        let routedNode = ringPositions[0];
+        for (let i = 0; i < ringPositions.length; i++) {
+          if (ringPositions[i].angle >= keyAngle) {
+            routedNode = ringPositions[i];
+            break;
+          }
+        }
+        if (!routedNode) routedNode = ringPositions[0]; // Wrap around to first node
+
+        // Draw Key Dot on Ring
+        const kRad = (keyAngle - 90) * Math.PI / 180;
+        const kx = cx + r * Math.cos(kRad);
+        const ky = cy + r * Math.sin(kRad);
+
+        const keyDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        keyDot.setAttribute('cx', kx);
+        keyDot.setAttribute('cy', ky);
+        keyDot.setAttribute('r', '6');
+        keyDot.setAttribute('fill', '#ff9f43');
+        keyDot.setAttribute('stroke', '#111111');
+        keyDot.setAttribute('stroke-width', '1');
+        svg.appendChild(keyDot);
+
+        const keyText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        keyText.setAttribute('x', cx + (r - 22) * Math.cos(kRad));
+        keyText.setAttribute('y', cy + (r - 22) * Math.sin(kRad) + 4);
+        keyText.setAttribute('text-anchor', 'middle');
+        keyText.setAttribute('font-family', 'monospace');
+        keyText.setAttribute('font-size', '11px');
+        keyText.setAttribute('font-weight', 'bold');
+        keyText.textContent = key;
+        svg.appendChild(keyText);
+
+        // Draw routing line clockwise
+        const routeNodeAngle = routedNode.angle;
+        drawClockwiseArc(svg, cx, cy, r, keyAngle, routeNodeAngle, nodeColors[routedNode.physicalName]);
+
+        // Add to data table
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${key}</strong></td>
+          <td>${keyAngle}°</td>
+          <td style="color: ${nodeColors[routedNode.physicalName]}; font-weight: bold;">${routedNode.name}</td>
+          <td>${routeNodeAngle}°</td>
+        `;
+        mappingTableBody.appendChild(row);
+      });
+
+      // Draw Cache Nodes
+      ringPositions.forEach(p => {
+        const rad = (p.angle - 90) * Math.PI / 180;
+        const nx = cx + r * Math.cos(rad);
+        const ny = cy + r * Math.sin(rad);
+
+        const nodeDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        nodeDot.setAttribute('cx', nx);
+        nodeDot.setAttribute('cy', ny);
+        nodeDot.setAttribute('r', p.isVirtual ? '10' : '14');
+        nodeDot.setAttribute('fill', nodeColors[p.physicalName]);
+        nodeDot.setAttribute('stroke', '#ffffff');
+        nodeDot.setAttribute('stroke-width', '2');
+        if (p.isVirtual) {
+          nodeDot.setAttribute('stroke-dasharray', '2,2');
+        }
+        svg.appendChild(nodeDot);
+
+        const nodeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        nodeText.setAttribute('x', cx + (r + 24) * Math.cos(rad));
+        nodeText.setAttribute('y', cy + (r + 24) * Math.sin(rad) + 4);
+        nodeText.setAttribute('text-anchor', 'middle');
+        nodeText.setAttribute('font-family', 'sans-serif');
+        nodeText.setAttribute('font-size', '10px');
+        nodeText.setAttribute('font-weight', 'bold');
+        nodeText.setAttribute('fill', nodeColors[p.physicalName]);
+        nodeText.textContent = p.name;
+        svg.appendChild(nodeText);
+      });
+    }
+
+    function drawClockwiseArc(svg, cx, cy, r, startAngle, endAngle, color) {
+      if (startAngle === endAngle) return;
+      let diff = endAngle - startAngle;
+      if (diff < 0) diff += 360;
+
+      // Draw clock-wise line representation using a thin colored SVG path
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      
+      const startRad = (startAngle - 90) * Math.PI / 180;
+      const endRad = (endAngle - 90) * Math.PI / 180;
+      
+      const x1 = cx + r * Math.cos(startRad);
+      const y1 = cy + r * Math.sin(startRad);
+      const x2 = cx + r * Math.cos(endRad);
+      const y2 = cy + r * Math.sin(endRad);
+      
+      const largeArcFlag = diff > 180 ? 1 : 0;
+      
+      const d = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2}`;
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('stroke-dasharray', '3,3');
+      svg.appendChild(path);
+    }
+
+    function addPhysicalNode() {
+      const allPossibleNodes = ['Node-A', 'Node-B', 'Node-C', 'Node-D', 'Node-E'];
+      const nextNode = allPossibleNodes.find(n => !physicalNodes.includes(n));
+      if (nextNode) {
+        physicalNodes.push(nextNode);
+        renderRing();
+      } else {
+        alert('Max cache node limit reached for this simulation.');
+      }
+    }
+
+    function removePhysicalNode() {
+      if (physicalNodes.length > 1) {
+        physicalNodes.pop();
+        renderRing();
+      } else {
+        alert('Minimum 1 physical cache server required.');
+      }
+    }
+
+    function toggleVirtualNodes() {
+      useVirtualNodes = document.getElementById('vnodes-toggle').value === 'on';
+      renderRing();
+    }
+
+    function addKeyPrefix() {
+      const input = document.getElementById('key-input');
+      const val = input.value.trim().toLowerCase();
+      if (val && /^[a-z]+$/.test(val)) {
+        if (!keys.includes(val)) {
+          keys.push(val);
+          keyHashes[val] = Math.floor(Math.random() * 360);
+          renderRing();
+        }
+        input.value = '';
+      } else {
+        alert('Letters only please.');
+      }
+    }
+
+    // Response sizing
+    window.addEventListener('resize', renderRing);
+
+    // Quiz Checking Logic
+    const correctAnswers = {
+      1: 0, // Avoids cache miss storms during scaling
+      2: 0  // Balances the key distribution patterns
+    };
+
+    function checkAnswer(quizId, optionIndex, element) {
+      const container = document.getElementById(`quiz-${quizId}`);
+      const options = container.querySelectorAll('.quiz-option');
+      const feedback = document.getElementById(`quiz-${quizId}-feedback`);
+      
+      options.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect');
+      });
+      
+      if (optionIndex === correctAnswers[quizId]) {
+        element.classList.add('correct');
+        feedback.textContent = "Correct! Magnificent.";
+        feedback.style.color = "var(--success-color)";
+      } else {
+        element.classList.add('incorrect');
+        options[correctAnswers[quizId]].classList.add('correct');
+        feedback.textContent = "Incorrect. Reflect on modulo-storm dynamics and hotspot balancing.";
+        feedback.style.color = "var(--error-color)";
+      }
+    }
+
+    // Launch setup
+    renderRing();
+  </script>
+</body>
+</html>

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 0001: Demystifying the Trie</title>
+  <style>
+    /* Tufte-inspired elegant typography and styling */
+    :root {
+      --bg-color: #fffff8;
+      --text-color: #111111;
+      --accent-color: #b33939;
+      --sidebar-text: #555555;
+      --card-bg: #f8f8f0;
+      --border-color: #dddddd;
+      --success-color: #218c74;
+      --error-color: #b33939;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 18px;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: normal;
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+    }
+
+    .lesson-meta {
+      font-style: italic;
+      color: var(--sidebar-text);
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: normal;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.3rem;
+      margin-top: 2.5rem;
+      color: var(--accent-color);
+    }
+
+    p {
+      margin-bottom: 1.5rem;
+    }
+
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.9rem;
+      background-color: #f1f1e6;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    pre {
+      background-color: #f4f4eb;
+      border-left: 3px solid var(--accent-color);
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+
+    /* Side notes structure for Tufte look */
+    .section-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .main-content {
+      flex: 1 1 550px;
+    }
+
+    .sidenote {
+      flex: 1 1 200px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--sidebar-text);
+      border-left: 1px solid var(--border-color);
+      padding-left: 0.8rem;
+      margin-top: 0.5rem;
+      align-self: flex-start;
+    }
+
+    /* Dynamic Trie Visualizer Card */
+    .visualizer-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 1rem;
+      background-color: #fff;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      background-color: var(--accent-color);
+      color: #fff;
+      font-family: inherit;
+      font-size: 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #8c2a2a;
+    }
+
+    .svg-container {
+      width: 100%;
+      height: 350px;
+      border: 1px solid var(--border-color);
+      background-color: #ffffff;
+      border-radius: 4px;
+      overflow: auto;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      min-width: 600px;
+    }
+
+    /* Interactive Quiz */
+    .quiz-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .quiz-question {
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .quiz-option {
+      display: block;
+      padding: 0.8rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: #ffffff;
+      transition: background-color 0.2s;
+      font-size: 0.95rem;
+    }
+
+    .quiz-option:hover {
+      background-color: #f1f1e6;
+    }
+
+    .quiz-option.correct {
+      background-color: #d1e7dd !important;
+      border-color: #badbcc !important;
+      color: #0f5132;
+    }
+
+    .quiz-option.incorrect {
+      background-color: #f8d7da !important;
+      border-color: #f5c2c7 !important;
+      color: #842029;
+    }
+
+    .feedback-msg {
+      margin-top: 1rem;
+      font-style: italic;
+      font-weight: bold;
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+      margin-top: 3rem;
+      font-size: 0.95rem;
+    }
+
+    a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="lesson-meta">Typeahead System Series — Lesson 0001</div>
+    <h1>Demystifying the Trie</h1>
+    <div class="lesson-meta">Targeting: System Design Interview Success • Duration: 10 mins</div>
+  </header>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        Imagine you are designing the search autocomplete system for a high-volume platform like Google or Amazon. Every single character typed by the user must immediately trigger a request to fetch matching popular queries, and the result must return in under <strong>10 milliseconds</strong>.
+      </p>
+      
+      <p>
+        If you store your search query logs in a relational database, you might be tempted to query them using:
+      </p>
+      
+      <pre><code>SELECT query FROM queries 
+WHERE query LIKE 'prefix%' 
+ORDER BY count DESC 
+LIMIT 10;</code></pre>
+
+      <p>
+        In an interview, proposing this is a major red flag. Why? A database <code>LIKE</code> scan requires a sequential scan of the table ($O(N)$ operations, where $N$ is the number of historical queries). Even with indexes, string matching at scale creates massive disk I/O bottlenecks.
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Red Flag Warning:</strong> Relational databases are optimized for transactional safety, not microsecond-level prefix lookups across billions of records. Always avoid database scans on the critical read path in system design interviews.
+    </div>
+  </div>
+
+  <h2>Enter the Trie (Prefix Tree)</h2>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        A <strong>Trie</strong> (pronounced "try", coming from "re<i>trie</i>val") is an ordered tree data structure used to store an associative array where the keys are strings. 
+      </p>
+      <p>
+        Unlike a standard binary tree, no node in the Trie stores the key associated with that node. Instead, its position in the tree defines the key it represents. All descendants of a node share a common prefix of the string associated with that node.
+      </p>
+      <p>
+        <strong>The Scaling Superpower:</strong> To look up matches for a prefix of length $L$, you only need to traverse down the tree $L$ steps. This makes lookup time complexity $O(L)$, which is completely independent of the total number of records ($N$) stored in the system! Since search prefixes are rarely longer than 15-20 characters, your search speed is guaranteed to be blistering fast.
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Visualizing Tries:</strong> Think of it as a roadmap. If you type <code>ca</code>, you follow the branch from root to <code>c</code>, then to <code>a</code>. Every node branching from <code>a</code> is a valid autocomplete suggestion!
+    </div>
+  </div>
+
+  <h2>Interactive Trie Builder</h2>
+  <p>
+    Build your own Trie. Type a word (e.g., "cat", "car", "cart", "dog", "dot") and its historical count below, insert it, and watch the Trie build and link live in the SVG below!
+  </p>
+
+  <div class="visualizer-card">
+    <div class="controls">
+      <input type="text" id="word-input" placeholder="Type a word (lowercase, e.g., 'cat')" value="cat" />
+      <input type="text" id="count-input" placeholder="Frequency" value="150" style="width: 80px;" />
+      <button onclick="insertWord()">Insert Word</button>
+      <button onclick="resetTrie()" style="background-color: #555;">Reset</button>
+    </div>
+    
+    <div class="svg-container">
+      <svg id="trie-svg"></svg>
+    </div>
+  </div>
+
+  <h2>Retrieval Practice</h2>
+  <p>
+    To make these core principles stick for your upcoming interviews, complete this quick self-assessment.
+  </p>
+
+  <!-- Quiz 1 -->
+  <div class="quiz-container" id="quiz-1">
+    <div class="quiz-question">1. What is the search time complexity for a query of prefix length L in a Trie?</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 0, this)">O(L) matching search length</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 1, this)">O(N) matching records count</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 2, this)">O(1) matching constant step</div>
+    <div class="feedback-msg" id="quiz-1-feedback"></div>
+  </div>
+
+  <!-- Quiz 2 -->
+  <div class="quiz-container" id="quiz-2">
+    <div class="quiz-question">2. What is the primary scaling disadvantage of a flat Trie in memory?</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 0, this)">High memory usage from pointers</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 1, this)">Slow query times from recursion</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 2, this)">Weak data safety from buffering</div>
+    <div class="feedback-msg" id="quiz-2-feedback"></div>
+  </div>
+
+  <div class="section-container">
+    <div class="main-content">
+      <h2>Next Steps</h2>
+      <p>
+        Now that you understand how a Trie works conceptually, our next step is to explore how to render suggestions efficiently on the frontend using <strong>debouncing</strong> to protect our backend from being overwhelmed by every single keystroke.
+      </p>
+      <p>
+        If anything in this lesson was unclear, or if you want to discuss how to optimize Trie memory footprints (such as using Compressed Tries or Radix Trees), please ask me!
+      </p>
+    </div>
+  </div>
+
+  <div class="nav-links">
+    <span>&larr; Previous: Setup</span>
+    <span>Recommended Primary Source: <a href="https://bytebytego.com/courses/system-design-interview/design-a-search-autocomplete-system" target="_blank">Alex Xu's Autocomplete System Design</a></span>
+    <span><a href="0002-debouncing-and-ui.html" id="next-link">Next: Lesson 0002 &rarr;</a></span>
+  </div>
+
+  <script>
+    // Simple Trie Data Structure Implementation
+    class TrieNode {
+      constructor(char = '') {
+        this.char = char;
+        this.children = {};
+        this.isWord = false;
+        this.count = 0;
+      }
+    }
+
+    let root = new TrieNode('root');
+
+    // Pre-populate with a few interesting words
+    function initDefaultTrie() {
+      root = new TrieNode('root');
+      insert('car', 100);
+      insert('cat', 200);
+      insert('dog', 150);
+      renderTrie();
+    }
+
+    function insert(word, count) {
+      let node = root;
+      for (let char of word) {
+        if (!node.children[char]) {
+          node.children[char] = new TrieNode(char);
+        }
+        node = node.children[char];
+      }
+      node.isWord = true;
+      node.count = count;
+    }
+
+    function insertWord() {
+      const wordInput = document.getElementById('word-input');
+      const countInput = document.getElementById('count-input');
+      const word = wordInput.value.trim().toLowerCase();
+      const count = parseInt(countInput.value) || 10;
+      
+      if (!word || !/^[a-z]+$/.test(word)) {
+        alert('Please enter a valid lowercase word (letters a-z only).');
+        return;
+      }
+
+      insert(word, count);
+      renderTrie();
+      wordInput.value = '';
+      wordInput.focus();
+    }
+
+    function resetTrie() {
+      root = new TrieNode('root');
+      renderTrie();
+    }
+
+    // Advanced SVG Layout Algorithm for the Trie
+    function renderTrie() {
+      const svg = document.getElementById('trie-svg');
+      svg.innerHTML = ''; // Clear SVG
+      
+      const width = svg.clientWidth || 800;
+      const height = svg.clientHeight || 350;
+      
+      // Collect nodes and levels to calculate coordinates
+      const nodesInfo = [];
+      const links = [];
+      
+      function traverse(node, depth, xStart, xEnd, parentX, parentY) {
+        const x = (xStart + xEnd) / 2;
+        const y = 50 + depth * 60;
+        
+        nodesInfo.push({
+          node,
+          x,
+          y,
+          depth
+        });
+        
+        if (parentX !== null && parentY !== null) {
+          links.push({
+            x1: parentX,
+            y1: parentY,
+            x2: x,
+            y2: y
+          });
+        }
+        
+        const childrenKeys = Object.keys(node.children).sort();
+        const numChildren = childrenKeys.length;
+        if (numChildren > 0) {
+          const segmentWidth = (xEnd - xStart) / numChildren;
+          childrenKeys.forEach((key, index) => {
+            const childXStart = xStart + index * segmentWidth;
+            const childXEnd = childXStart + segmentWidth;
+            traverse(node.children[key], depth + 1, childXStart, childXEnd, x, y);
+          });
+        }
+      }
+      
+      traverse(root, 0, 20, width - 20, null, null);
+      
+      // Draw Links
+      links.forEach(link => {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', link.x1);
+        line.setAttribute('y1', link.y1);
+        line.setAttribute('x2', link.x2);
+        line.setAttribute('y2', link.y2);
+        line.setAttribute('stroke', '#ccc');
+        line.setAttribute('stroke-width', '1.5');
+        svg.appendChild(line);
+      });
+      
+      // Draw Nodes
+      nodesInfo.forEach(info => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', info.x);
+        circle.setAttribute('cy', info.y);
+        circle.setAttribute('r', info.node.isWord ? '20' : '16');
+        circle.setAttribute('fill', info.node.isWord ? '#ffeb3b' : '#ffffff');
+        circle.setAttribute('stroke', info.node.isWord ? '#b33939' : '#111111');
+        circle.setAttribute('stroke-width', info.node.isWord ? '2.5' : '1.5');
+        g.appendChild(circle);
+        
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', info.x);
+        text.setAttribute('y', info.y + 5);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('font-family', 'sans-serif');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('font-size', '12px');
+        text.setAttribute('fill', '#111111');
+        text.textContent = info.node.char;
+        g.appendChild(text);
+        
+        if (info.node.isWord) {
+          const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+          title.textContent = `Word terminal! Pop count: ${info.node.count}`;
+          g.appendChild(title);
+        }
+        
+        svg.appendChild(g);
+      });
+    }
+
+    // Auto-resized SVG responsiveness
+    window.addEventListener('resize', renderTrie);
+    
+    // Quiz Checking Logic
+    const correctAnswers = {
+      1: 0, // O(L)
+      2: 0  // High memory usage from pointers
+    };
+
+    function checkAnswer(quizId, optionIndex, element) {
+      const container = document.getElementById(`quiz-${quizId}`);
+      const options = container.querySelectorAll('.quiz-option');
+      const feedback = document.getElementById(`quiz-${quizId}-feedback`);
+      
+      // Clear previous styles
+      options.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect');
+      });
+      
+      if (optionIndex === correctAnswers[quizId]) {
+        element.classList.add('correct');
+        feedback.textContent = "Correct! Well done.";
+        feedback.style.color = "var(--success-color)";
+      } else {
+        element.classList.add('incorrect');
+        options[correctAnswers[quizId]].classList.add('correct');
+        feedback.textContent = "Try again! Recall the definitions we just covered.";
+        feedback.style.color = "var(--error-color)";
+      }
+    }
+
+    // Run setup
+    initDefaultTrie();
+  </script>
+</body>
+</html>

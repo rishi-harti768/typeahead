@@ -1,0 +1,3 @@
+# Recency-Aware Ranking via Exponential Time Decay
+
+To implement trending searches that prioritize recently popular queries over older historical data, we decided to score and rank prefix suggestions using Exponential Time Decay. Counts are recorded into memory-efficient Time-Binned Buckets (grouped by 1-minute intervals) rather than logging individual event timestamps, and decayed using a mathematical half-life formula (configured to 5 minutes for demo visibility). Autocomplete suggestions are served through a distributed cache using Passive TTL (Time-To-Live) expiration, which automatically evicts stale rankings over time without requiring active, write-amplifying cache invalidations from database updates.

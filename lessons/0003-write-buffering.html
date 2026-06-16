@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 0003: Write Buffering & Aggregation</title>
+  <style>
+    :root {
+      --bg-color: #fffff8;
+      --text-color: #111111;
+      --accent-color: #b33939;
+      --sidebar-text: #555555;
+      --card-bg: #f8f8f0;
+      --border-color: #dddddd;
+      --success-color: #218c74;
+      --error-color: #b33939;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 18px;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: normal;
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+    }
+
+    .lesson-meta {
+      font-style: italic;
+      color: var(--sidebar-text);
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: normal;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.3rem;
+      margin-top: 2.5rem;
+      color: var(--accent-color);
+    }
+
+    p {
+      margin-bottom: 1.5rem;
+    }
+
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.9rem;
+      background-color: #f1f1e6;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    pre {
+      background-color: #f4f4eb;
+      border-left: 3px solid var(--accent-color);
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+
+    .section-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .main-content {
+      flex: 1 1 550px;
+    }
+
+    .sidenote {
+      flex: 1 1 200px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--sidebar-text);
+      border-left: 1px solid var(--border-color);
+      padding-left: 0.8rem;
+      margin-top: 0.5rem;
+      align-self: flex-start;
+    }
+
+    /* Buffer simulator layout */
+    .visualizer-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+
+    .simulation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    @media (max-width: 600px) {
+      .simulation-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 1rem;
+      background: #ffffff;
+      min-height: 180px;
+      position: relative;
+    }
+
+    .panel-title {
+      font-family: sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      color: #777777;
+      text-transform: uppercase;
+      border-bottom: 1px dashed var(--border-color);
+      padding-bottom: 0.3rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .query-pill-btn {
+      background-color: #f1f1e6;
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      padding: 0.3rem 0.6rem;
+      font-size: 0.85rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .query-pill-btn:hover {
+      background-color: var(--accent-color);
+      color: white;
+    }
+
+    .flush-progress-bar {
+      height: 4px;
+      background-color: var(--border-color);
+      width: 100%;
+      margin-top: 1rem;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .flush-progress-fill {
+      height: 100%;
+      background-color: var(--accent-color);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    /* List styling inside panels */
+    .data-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.3rem 0;
+      border-bottom: 1px solid #f9f9f9;
+      animation: highlightNew 0.5s ease-out;
+    }
+
+    @keyframes highlightNew {
+      0% { background-color: rgba(255, 235, 59, 0.4); }
+      100% { background-color: transparent; }
+    }
+
+    .crash-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(179, 57, 57, 0.95);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      font-weight: bold;
+      font-size: 1.1rem;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      z-index: 20;
+    }
+
+    /* Quiz */
+    .quiz-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .quiz-question {
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .quiz-option {
+      display: block;
+      padding: 0.8rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: #ffffff;
+      transition: background-color 0.2s;
+      font-size: 0.95rem;
+    }
+
+    .quiz-option:hover {
+      background-color: #f1f1e6;
+    }
+
+    .quiz-option.correct {
+      background-color: #d1e7dd !important;
+      border-color: #badbcc !important;
+      color: #0f5132;
+    }
+
+    .quiz-option.incorrect {
+      background-color: #f8d7da !important;
+      border-color: #f5c2c7 !important;
+      color: #842029;
+    }
+
+    .feedback-msg {
+      margin-top: 1rem;
+      font-style: italic;
+      font-weight: bold;
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+      margin-top: 3rem;
+      font-size: 0.95rem;
+    }
+
+    a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="lesson-meta">Typeahead System Series — Lesson 0003</div>
+    <h1>Write Buffering & Aggregation</h1>
+    <div class="lesson-meta">Targeting: System Design Interview Success • Duration: 12 mins</div>
+  </header>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        In Lesson 0002, we optimized the read path by implementing client-side debouncing. Now, let's explore the <strong>write path</strong>. When a user completes their search and presses "Enter", the system must record this submission to update search popularity and capture emerging trends.
+      </p>
+      
+      <p>
+        In a system design interview, if you propose that every search submission triggers a direct, synchronous database write like <code>UPDATE queries SET count = count + 1 WHERE word = 'iphone'</code>, the interviewer will challenge you. 
+      </p>
+      
+      <p>
+        Relational databases and even persistent NoSQL databases are heavily optimized for query retrieval, but persistent disk writes are extremely slow compared to RAM. Synchronous writes on every single search submission create a severe bottleneck under heavy traffic.
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Write Bottleneck:</strong> Disk storage commits require head movements or flash cell erasing, which are orders of magnitude slower than memory adjustments.
+    </div>
+  </div>
+
+  <h2>The Solution: Write Buffering</h2>
+
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        To bypass this bottleneck, we use a <strong>Write-Buffered Aggregation</strong> mechanism.
+      </p>
+      <p>
+        When a user submits a search query:
+      </p>
+      <ol>
+        <li>We intercept the write request in an **in-memory buffer** (or lightweight queue).</li>
+        <li>We aggregate identical searches in RAM. For example, if "iphone" is searched 150 times within a 5-second window, we merge those into a single entry: <code>{ "iphone": 150 }</code>.</li>
+        <li>We periodically flush these aggregated counts to the database in **batches**.</li>
+      </ol>
+      <p>
+        By doing this, we reduce our database write operations from 150 disk operations down to exactly **one batch write**!
+      </p>
+    </div>
+
+    <div class="sidenote">
+      <strong>Eventual Consistency:</strong> This means query counts are eventually consistent. Popularity updates won't show in suggestions instantly, which is completely acceptable for auto-complete.
+    </div>
+  </div>
+
+  <h2>Dreaded Interview Trade-off: Crash Recovery</h2>
+  
+  <div class="section-container">
+    <div class="main-content">
+      <p>
+        There is no free lunch in systems architecture. The major risk of in-memory buffering is **durability failure**. If your application server crashes or loses power before flushing the buffer, all pending counts stored in RAM are lost forever.
+      </p>
+      <p>
+        In system design interviews, you show deep mastery by proposing mitigations:
+      </p>
+      <ul>
+        <li><strong>Accept the loss:</strong> Since search autocomplete logs aren't financial transactions, a small data loss under rare crash scenarios is completely acceptable.</li>
+        <li><strong>Write-Ahead Log (WAL):</strong> Append each raw submission sequentially to a lightweight log file on disk before updating the RAM buffer. Since sequential disk appends are extremely fast, you get durability without the slow index search penalties.</li>
+      </ul>
+    </div>
+
+    <div class="sidenote">
+      <strong>Mastering Trade-offs:</strong> Interviewers value candidates who proactively state what *fails* in their architecture and how they balance data safety against speed.
+    </div>
+  </div>
+
+  <h2>Interactive Write-Buffer Simulator</h2>
+  <p>
+    Simulate write traffic. Click the popular query buttons rapidly or type custom queries. Watch them accumulate and aggregate in the **In-Memory Buffer** panel. Every 5 seconds, watch the buffer flush, saving aggregated counts to the **Durable Database on Disk**! 
+  </p>
+  <p>
+    <em>Try clicking "Simulate Server Crash" while counts are in the buffer to experience the data-loss trade-off!</em>
+  </p>
+
+  <div class="visualizer-card">
+    <div class="controls">
+      <button class="query-pill-btn" onclick="submitQuery('iphone')">Search: iphone</button>
+      <button class="query-pill-btn" onclick="submitQuery('react')">Search: react</button>
+      <button class="query-pill-btn" onclick="submitQuery('node')">Search: node</button>
+      <input type="text" id="custom-query" placeholder="Or type query..." style="width: 150px; padding: 0.3rem;" />
+      <button onclick="submitCustomQuery()" style="padding: 0.3rem 0.8rem;">Submit</button>
+      <button onclick="simulateCrash()" style="background-color: var(--error-color); padding: 0.3rem 0.8rem; margin-left: auto;">Simulate Server Crash</button>
+    </div>
+
+    <div class="simulation-grid">
+      <!-- RAM PANEL -->
+      <div class="panel" id="ram-panel">
+        <div class="panel-title">In-Memory Buffer (RAM)</div>
+        <ul class="data-list" id="ram-list">
+          <li style="color: #999; font-style: italic;">Buffer is empty</li>
+        </ul>
+        
+        <div class="crash-overlay" id="crash-overlay">
+          SERVER CRASHED!<br>RAM DATA WIPED OUT
+        </div>
+      </div>
+
+      <!-- DISK PANEL -->
+      <div class="panel" id="disk-panel">
+        <div class="panel-title">Durable Database (Disk Index)</div>
+        <ul class="data-list" id="disk-list">
+          <div class="data-row"><span>iphone</span><span>1000</span></div>
+          <div class="data-row"><span>react</span><span>500</span></div>
+          <div class="data-row"><span>node</span><span>300</span></div>
+        </ul>
+      </div>
+    </div>
+
+    <div class="flush-progress-bar">
+      <div class="flush-progress-fill" id="flush-progress"></div>
+    </div>
+    <div style="font-family: sans-serif; font-size: 11px; text-align: right; color: var(--sidebar-text); margin-top: 3px;" id="timer-label">
+      Next Flush: 5.0s
+    </div>
+  </div>
+
+  <h2>Retrieval Practice</h2>
+
+  <!-- Quiz 1 -->
+  <div class="quiz-container" id="quiz-1">
+    <div class="quiz-question">1. What is the primary benefit of aggregating search queries in a buffer before writing to the database?</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 0, this)">Reduces database write operations</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 1, this)">Enforce database transaction rule</div>
+    <div class="quiz-option" onclick="checkAnswer(1, 2, this)">Prevent database schema collision</div>
+    <div class="feedback-msg" id="quiz-1-feedback"></div>
+  </div>
+
+  <!-- Quiz 2 -->
+  <div class="quiz-container" id="quiz-2">
+    <div class="quiz-question">2. In system design, how is data loss mitigated if a write buffer node crashes before flushing?</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 0, this)">Use write ahead logs for recovery</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 1, this)">Run secondary replication cluster</div>
+    <div class="quiz-option" onclick="checkAnswer(2, 2, this)">Add redundant cache memory arrays</div>
+    <div class="feedback-msg" id="quiz-2-feedback"></div>
+  </div>
+
+  <div class="section-container">
+    <div class="main-content">
+      <h2>Next Steps</h2>
+      <p>
+        Fantastic job! You now understand both sides of scale: client-side debouncing and write-side buffering.
+      </p>
+      <p>
+        Next, we will scale out horizontally in **[Lesson 0004: Consistent Hashing & Distributed Cache]**. When our single-cache node becomes too small to hold all suggestion prefixes, how do we distribute the key space across a cache pool?
+      </p>
+      <p>
+        Ask me any questions on eventual consistency, WAL details, or batch writes!
+      </p>
+    </div>
+  </div>
+
+  <div class="nav-links">
+    <span><a href="0002-debouncing-and-ui.html">&larr; Previous: Lesson 0002</a></span>
+    <span>Recommended Primary Source: <a href="https://github.com/donnemartin/system-design-primer" target="_blank">The System Design Primer</a></span>
+    <span><a href="0004-consistent-hashing.html" id="next-link">Next: Lesson 0004 &rarr;</a></span>
+  </div>
+
+  <script>
+    // Simulator State
+    let ramBuffer = {};
+    let diskDatabase = {
+      'iphone': 1000,
+      'react': 500,
+      'node': 300
+    };
+
+    let flushTimeTotal = 5000; // 5 seconds
+    let flushTimeRemaining = 5000;
+    let progressTimer = null;
+
+    function startTimer() {
+      clearInterval(progressTimer);
+      flushTimeRemaining = flushTimeTotal;
+      progressTimer = setInterval(() => {
+        flushTimeRemaining -= 100;
+        const percent = ((flushTimeTotal - flushTimeRemaining) / flushTimeTotal) * 100;
+        document.getElementById('flush-progress').style.width = `${percent}%`;
+        document.getElementById('timer-label').textContent = `Next Flush: ${(Math.max(0, flushTimeRemaining)/1000).toFixed(1)}s`;
+
+        if (flushTimeRemaining <= 0) {
+          flushBuffer();
+        }
+      }, 100);
+    }
+
+    function submitQuery(query) {
+      query = query.trim().toLowerCase();
+      if (!query) return;
+
+      if (!ramBuffer[query]) {
+        ramBuffer[query] = 0;
+      }
+      ramBuffer[query]++;
+      updateRamPanel();
+    }
+
+    function submitCustomQuery() {
+      const input = document.getElementById('custom-query');
+      const val = input.value.trim().toLowerCase();
+      if (val && /^[a-z\s]+$/.test(val)) {
+        submitQuery(val);
+        input.value = '';
+      } else {
+        alert('Please enter letters only.');
+      }
+    }
+
+    function updateRamPanel() {
+      const list = document.getElementById('ram-list');
+      const keys = Object.keys(ramBuffer);
+      if (keys.length === 0) {
+        list.innerHTML = `<li style="color: #999; font-style: italic;">Buffer is empty</li>`;
+        return;
+      }
+
+      list.innerHTML = '';
+      keys.forEach(key => {
+        const row = document.createElement('li');
+        row.className = 'data-row';
+        row.innerHTML = `<span>${key}</span><span>+${ramBuffer[key]}</span>`;
+        list.appendChild(row);
+      });
+    }
+
+    function updateDiskPanel() {
+      const list = document.getElementById('disk-list');
+      list.innerHTML = '';
+      
+      // Sort keys to look clean
+      const sortedKeys = Object.keys(diskDatabase).sort((a,b) => diskDatabase[b] - diskDatabase[a]);
+      
+      sortedKeys.forEach(key => {
+        const row = document.createElement('div');
+        row.className = 'data-row';
+        row.innerHTML = `<span>${key}</span><span>${diskDatabase[key]}</span>`;
+        list.appendChild(row);
+      });
+    }
+
+    function flushBuffer() {
+      const keys = Object.keys(ramBuffer);
+      if (keys.length > 0) {
+        keys.forEach(key => {
+          if (!diskDatabase[key]) {
+            diskDatabase[key] = 0;
+          }
+          diskDatabase[key] += ramBuffer[key];
+        });
+        
+        ramBuffer = {};
+        updateRamPanel();
+        updateDiskPanel();
+      }
+      startTimer();
+    }
+
+    function simulateCrash() {
+      clearInterval(progressTimer);
+      
+      // Show overlay
+      const overlay = document.getElementById('crash-overlay');
+      overlay.style.opacity = '1';
+      
+      ramBuffer = {};
+      updateRamPanel();
+
+      setTimeout(() => {
+        overlay.style.opacity = '0';
+        startTimer();
+      }, 2500);
+    }
+
+    // Quiz Checking Logic
+    const correctAnswers = {
+      1: 0, // Reduces database write operations
+      2: 0  // Use write ahead logs for recovery
+    };
+
+    function checkAnswer(quizId, optionIndex, element) {
+      const container = document.getElementById(`quiz-${quizId}`);
+      const options = container.querySelectorAll('.quiz-option');
+      const feedback = document.getElementById(`quiz-${quizId}-feedback`);
+      
+      options.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect');
+      });
+      
+      if (optionIndex === correctAnswers[quizId]) {
+        element.classList.add('correct');
+        feedback.textContent = "Correct! Spot on.";
+        feedback.style.color = "var(--success-color)";
+      } else {
+        element.classList.add('incorrect');
+        options[correctAnswers[quizId]].classList.add('correct');
+        feedback.textContent = "Incorrect. Reflect on how buffered logs protect in-memory data.";
+        feedback.style.color = "var(--error-color)";
+      }
+    }
+
+    // Launch setup
+    startTimer();
+  </script>
+</body>
+</html>

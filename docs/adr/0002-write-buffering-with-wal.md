@@ -1,0 +1,3 @@
+# Write Buffering with Write-Ahead Log (WAL)
+
+To handle high search submission write pressure without degrading autocomplete read performance, we decided to implement an aggregated Write Buffering layer in volatile RAM coupled with an append-only Write-Ahead Log (WAL) on disk. Raw search requests are immediately appended to `wal.log` to guarantee persistence, while popularity count updates are aggregated in the memory buffer and written to the primary JSON database only in periodic or size-triggered batches (Flush-and-Truncate). This trade-off significantly reduces database write-amplification at the cost of a slight latency (up to 10 seconds) before new searches appear in autocomplete suggestions.
