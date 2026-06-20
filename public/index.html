@@ -830,6 +830,21 @@
                 />
               </div>
 
+              <!-- Ranking Algorithm Toggle Row -->
+              <div class="control-row" style="margin-top: 1rem; margin-bottom: 0.5rem; flex-direction: column; align-items: flex-start; gap: 0.5rem; border-bottom: none;">
+                <div class="control-header" style="width: 100%;">
+                  <span class="control-label" style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Ranking Algorithm</span>
+                </div>
+                <div class="ranking-options" style="display: flex; gap: 0.5rem; width: 100%;">
+                  <button type="button" class="ranking-btn active" id="ranking-basic-btn" style="flex: 1; padding: 0.6rem; background: rgba(99, 102, 241, 0.15); border: 1px solid var(--primary); border-radius: 8px; font-size: 0.8rem; color: var(--text-primary); cursor: pointer; transition: all 0.2s; font-family: var(--font-sans); font-weight: 600;">
+                    Frequency
+                  </button>
+                  <button type="button" class="ranking-btn" id="ranking-recency-btn" style="flex: 1; padding: 0.6rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; font-family: var(--font-sans); font-weight: 600;">
+                    Recency (Decay)
+                  </button>
+                </div>
+              </div>
+
               <div class="control-row" style="gap: 0.35rem;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary);">
                   <span>Total keystrokes:</span>
@@ -890,6 +905,37 @@
           <div class="metric-row">
             <span class="metric-label">Pre-Cached Completion Count</span>
             <span class="metric-value" id="metric-results">0 / 10 max</span>
+          </div>
+        </div>
+
+        <!-- Durable Storage & WAL Telemetry Panel -->
+        <div class="metrics-panel" style="margin-top: 1.75rem; border-top: 1px dashed rgba(255, 255, 255, 0.08); padding-top: 1.25rem;">
+          <div class="section-title" style="font-size: 1.1rem; margin-bottom: 0.5rem;">
+            <div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              <span>Durable Storage & WAL Telemetry</span>
+            </div>
+          </div>
+
+          <div class="metric-row">
+            <span class="metric-label">WAL Log File Size</span>
+            <span class="metric-value highlight" id="metric-wal-size" style="transition: all 0.3s;">0 bytes</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Buffered Queries (RAM)</span>
+            <span class="metric-value" id="metric-pending-buffer">0 / 50</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Database Flushes Count</span>
+            <span class="metric-value" id="metric-flushes-count" style="transition: all 0.3s;">0</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Total Durable Searches</span>
+            <span class="metric-value" id="metric-total-searches">0</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Disk Write Savings</span>
+            <span class="metric-value speed" id="metric-write-savings">0 writes</span>
           </div>
         </div>
       </div>
@@ -1026,6 +1072,9 @@
     let selectedIndex = -1;
     let keystrokeCount = 0;
     let requestCount = 0;
+    let activeRankingMode = 'basic';
+    let lastWalSize = 0;
+    let lastFlushesCount = 0;
 
     // Node Color Palette Maps
     const nodeColors = {
@@ -1070,6 +1119,50 @@
       debounceVal.innerText = `${val} ms`;
     });
 
+    // Ranking algorithm toggles logic
+    const rankingBasicBtn = document.getElementById('ranking-basic-btn');
+    const rankingRecencyBtn = document.getElementById('ranking-recency-btn');
+    
+    rankingBasicBtn.addEventListener('click', () => {
+      if (activeRankingMode === 'basic') return;
+      activeRankingMode = 'basic';
+      rankingBasicBtn.classList.add('active');
+      rankingBasicBtn.style.background = 'rgba(99, 102, 241, 0.15)';
+      rankingBasicBtn.style.borderColor = 'var(--primary)';
+      rankingBasicBtn.style.color = 'var(--text-primary)';
+      
+      rankingRecencyBtn.classList.remove('active');
+      rankingRecencyBtn.style.background = 'rgba(255, 255, 255, 0.03)';
+      rankingRecencyBtn.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+      rankingRecencyBtn.style.color = 'var(--text-secondary)';
+      
+      addLog('System', 'Switched ranking mode to: Frequency (Cached)');
+      
+      if (input.value.trim()) {
+        fetchSuggestions(input.value);
+      }
+    });
+    
+    rankingRecencyBtn.addEventListener('click', () => {
+      if (activeRankingMode === 'recency') return;
+      activeRankingMode = 'recency';
+      rankingRecencyBtn.classList.add('active');
+      rankingRecencyBtn.style.background = 'rgba(6, 182, 212, 0.15)';
+      rankingRecencyBtn.style.borderColor = 'var(--secondary)';
+      rankingRecencyBtn.style.color = 'var(--text-primary)';
+      
+      rankingBasicBtn.classList.remove('active');
+      rankingBasicBtn.style.background = 'rgba(255, 255, 255, 0.03)';
+      rankingBasicBtn.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+      rankingBasicBtn.style.color = 'var(--text-secondary)';
+      
+      addLog('System', 'Switched ranking mode to: Recency-Aware (Decay)');
+      
+      if (input.value.trim()) {
+        fetchSuggestions(input.value);
+      }
+    });
+
     // Keyboard navigation and events
     input.addEventListener('keydown', (e) => {
       if (!currentSuggestions.length) return;
@@ -1110,6 +1203,7 @@
       closeSuggestions();
       visualizeTriePath(suggestion.query, false, true);
       addLog('API', `Selected suggestion: "${suggestion.query}"`);
+      handleSearchSubmit(suggestion.query);
     }
 
     function closeSuggestions() {
@@ -1153,7 +1247,7 @@
       addLog('API', `Dispatched prefix lookup: "${trimmed}"`);
 
       try {
-        const response = await fetch(`/suggest?q=${encodeURIComponent(trimmed)}`);
+        const response = await fetch(`/suggest?q=${encodeURIComponent(trimmed)}&ranking=${activeRankingMode}`);
         const data = await response.json();
         const endTime = performance.now();
         const latency = (endTime - startTime).toFixed(2);
@@ -1205,6 +1299,10 @@
           rightPart = cleanQuery.slice(query.length);
         }
 
+        const countDisplay = activeRankingMode === 'recency'
+          ? `${Math.round(comp.count).toLocaleString()} score`
+          : `${comp.count.toLocaleString()} queries`;
+
         return `
           <div class="suggestion-item" data-index="${idx}">
             <div class="suggestion-left">
@@ -1214,7 +1312,7 @@
               </span>
             </div>
             <div class="suggestion-right">
-              <span class="count-badge">${comp.count.toLocaleString()} queries</span>
+              <span class="count-badge">${countDisplay}</span>
             </div>
           </div>
         `;
@@ -1392,19 +1490,39 @@
     }
 
     // Throttle Search Submission logic
-    const handleSearchSubmit = throttle((query) => {
+    const handleSearchSubmit = throttle(async (query) => {
       const cleanQuery = query.trim();
       if (!cleanQuery) return;
 
-      addLog('Submit', `Successfully submitted search: "${cleanQuery}"`);
+      addLog('Submit', `Dispatching durable search: "${cleanQuery}"`);
       
       submitBtn.innerText = 'Searching...';
       submitBtn.disabled = true;
-      
-      setTimeout(() => {
-        submitBtn.innerText = 'Search';
-        submitBtn.disabled = false;
-      }, 2000);
+
+      try {
+        const response = await fetch('/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ query: cleanQuery })
+        });
+        
+        if (response.ok) {
+          addLog('WAL', `Durable write appended to WAL: "${cleanQuery}"`);
+          // Instantly refresh metrics to reflect the new WAL size and buffer count
+          fetchServerMetrics();
+        } else {
+          addLog('System', `Search submission failed with status ${response.status}`);
+        }
+      } catch (err) {
+        addLog('System', `Network error during submission: ${err.message}`);
+      } finally {
+        setTimeout(() => {
+          submitBtn.innerText = 'Search';
+          submitBtn.disabled = false;
+        }, 2000);
+      }
     }, 2000);
 
     searchForm.addEventListener('submit', (e) => {
@@ -1423,9 +1541,73 @@
       }
     });
 
-    // Fetch initial ring layout on load
+    // Highlight flash effects on metric updates to enhance user experience
+    function updateMetricHighlights(analytics) {
+      const walEl = document.getElementById('metric-wal-size');
+      const flushEl = document.getElementById('metric-flushes-count');
+      
+      if (analytics.walSize > lastWalSize) {
+        // Flash amber/orange when WAL grows
+        walEl.style.color = 'var(--accent)';
+        walEl.style.textShadow = '0 0 10px var(--accent)';
+        setTimeout(() => {
+          walEl.style.color = 'var(--secondary)';
+          walEl.style.textShadow = 'none';
+        }, 800);
+      } else if (analytics.walSize === 0 && lastWalSize > 0) {
+        // Flash green when WAL gets truncated (flushed)
+        walEl.style.color = 'var(--success)';
+        walEl.style.textShadow = '0 0 10px var(--success)';
+        setTimeout(() => {
+          walEl.style.color = 'var(--text-primary)';
+          walEl.style.textShadow = 'none';
+        }, 800);
+      }
+      
+      if (analytics.flushesCount > lastFlushesCount) {
+        // Flash green when a DB flush occurs
+        flushEl.style.color = 'var(--success)';
+        flushEl.style.textShadow = '0 0 10px var(--success)';
+        setTimeout(() => {
+          flushEl.style.color = 'var(--text-primary)';
+          flushEl.style.textShadow = 'none';
+        }, 800);
+        addLog('Database', `Background Flush-and-Truncate completed: ${analytics.flushesCount} flushes total`);
+      }
+      
+      lastWalSize = analytics.walSize;
+      lastFlushesCount = analytics.flushesCount;
+    }
+
+    // Fetch Server-Level Metrics (WAL & Database Analytics)
+    async function fetchServerMetrics() {
+      try {
+        const response = await fetch('/metrics');
+        const data = await response.json();
+        
+        // Extract server-level analytics
+        const analytics = data.analytics;
+        if (analytics) {
+          document.getElementById('metric-wal-size').innerText = `${analytics.walSize} bytes`;
+          document.getElementById('metric-pending-buffer').innerText = `${analytics.pendingBuffer} / 50`;
+          document.getElementById('metric-flushes-count').innerText = analytics.flushesCount;
+          document.getElementById('metric-total-searches').innerText = analytics.totalSearchesSubmitted;
+          document.getElementById('metric-write-savings').innerText = `${analytics.writeSavings} writes`;
+          
+          updateMetricHighlights(analytics);
+        }
+      } catch (err) {
+        console.error("Failed to fetch server metrics:", err);
+      }
+    }
+
+    // Fetch initial ring layout and storage metrics on load
     fetchHashRingRouting("init");
+    fetchServerMetrics();
     updateEfficiency();
+
+    // Periodically poll server-level metrics every 1.5 seconds to keep metrics in sync
+    setInterval(fetchServerMetrics, 1500);
   </script>
 </body>
 </html>
